@@ -16,7 +16,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:12
+        image: postgres
         env:
           POSTGRES_USER: root
           POSTGRES_PASSWORD: secret
@@ -38,6 +38,9 @@ jobs:
           go-version: ^1.21
         id: go
 
+      - name: test db
+        run: psql -h localhost -U postgres -d simple_bank
+        
       - name: install golang-migration
         run: |
           curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz | tar xvz
