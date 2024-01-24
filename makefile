@@ -11,7 +11,7 @@ restartpg:
 	docker restart mypostgres
 
 psql:
-	docker exec -it mypostgres psql -U root -d simple_bank
+	docker exec -it mypostgres psql -U root -W secret -d simple_bank
 
 createdb:
 	docker exec -it mypostgres createdb --username=root --owner=root simple_bank
