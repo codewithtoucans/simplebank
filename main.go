@@ -22,7 +22,7 @@ func main() {
 
 	store := db.NewStore(conn)
 
-	server := api.NewServer(store)
+	server := api.NewServer(config, store)
 
 	log.Printf("Starting server at %s", config.ServerAddress)
 	if err = server.Start(config.ServerAddress); err != nil {
