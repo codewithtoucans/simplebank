@@ -6,11 +6,11 @@ import (
 	"net/http"
 
 	db "github.com/codewithtoucans/simplebank/db/sqlc"
+	"github.com/codewithtoucans/simplebank/token"
 	"github.com/gin-gonic/gin"
 )
 
 type createAccountRequest struct {
-	Owner    string `json:"owner" binding:"required"`
 	Currency string `json:"currency" binding:"required,oneof=currency"`
 }
 
@@ -18,17 +18,19 @@ func (s *server) createAccount(ctx *gin.Context) {
 	var req createAccountRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errReponse(err))
+		ctx.JSON(http.StatusBadRequest, errResponse(err))
 		return
 	}
 
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+
 	account, err := s.store.CreateAccount(ctx, db.CreateAccountParams{
-		Owner:    req.Owner,
+		Owner:    authPayload.Username,
 		Currency: req.Currency,
 		Balance:  0,
 	})
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errReponse(err))
+		ctx.JSON(http.StatusInternalServerError, errResponse(err))
 		return
 	}
 
@@ -42,17 +44,24 @@ type getAccountRequest struct {
 func (s *server) getAccount(ctx *gin.Context) {
 	var req getAccountRequest
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errReponse(err))
+		ctx.JSON(http.StatusBadRequest, errResponse(err))
 		return
 	}
 
 	account, err := s.store.GetAccount(ctx, req.ID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			ctx.JSON(http.StatusNotFound, errReponse(err))
+			ctx.JSON(http.StatusNotFound, errResponse(err))
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, errReponse(err))
+		ctx.JSON(http.StatusInternalServerError, errResponse(err))
+		return
+	}
+
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+	if account.Owner != authPayload.Username {
+		err := errors.New("account doesn't belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errResponse(err))
 		return
 	}
 
@@ -68,20 +77,22 @@ func (s *server) listAccount(ctx *gin.Context) {
 	var req listAccountRequest
 
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errReponse(err))
+		ctx.JSON(http.StatusBadRequest, errResponse(err))
 		return
 	}
 
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
 	accounts, err := s.store.ListAccounts(ctx, db.ListAccountsParams{
+		Owner:  authPayload.Username,
 		Limit:  req.PageSize,
 		Offset: (req.PageID - 1) * req.PageSize,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			ctx.JSON(http.StatusNotFound, errReponse(err))
+			ctx.JSON(http.StatusNotFound, errResponse(err))
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, errReponse(err))
+		ctx.JSON(http.StatusInternalServerError, errResponse(err))
 		return
 	}
 
